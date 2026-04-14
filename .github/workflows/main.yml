@@ -2,55 +2,50 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [ main ]  # 当你向 main 分支 push 代码时触发
+    branches: [ main ]  # 确保你的主分支名是 main，如果是 master 请修改
   pull_request:
     branches: [ main ]
 
 jobs:
   build:
-    runs-on: macos-latest  # 必须使用 macOS 运行器来编译 iOS
+    runs-on: macos-latest  # 必须使用 macOS 运行器
 
     steps:
-      # 1. 拉取仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 Flutter 环境
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true # 开启缓存，加快以后编译的速度
+          cache: true 
 
-      # 3. 安装 Dart 依赖包
-      - name: Install Dependencies
+      - name: Install Dart Dependencies
         run: flutter pub get
 
-      # 4. 自动补全缺失的 iOS 工程文件 (针对你的报错进行的修复)
-      - name: Repair Flutter Project
+      - name: Repair and Create iOS Project
+        # 这一步会根据你的 pubspec.yaml 自动生成缺失的 ios/Runner.xcodeproj 等文件
         run: flutter create . --platforms=ios
 
-      # 5. 安装 CocoaPods (iOS 编译必备的底层库管理工具)
       - name: Install CocoaPods
+        # iOS 编译的核心依赖管理，必须运行
         run: |
           cd ios
           pod install
           cd ..
 
-      # 6. 编译生成未签名的 .app 文件
       - name: Build iOS App Bundle
+        # 生成未签名的 .app 构建产物
         run: flutter build ios --release --no-codesign
 
-      # 7. 将 .app 转换为 Sideloadly 可识别的 .ipa 格式
-      - name: Create IPA Package
+      - name: Create IPA Package for Sideloadly
+        # 将 .app 包装成 .ipa 格式，方便在 Windows 上通过 Sideloadly 安装
         run: |
           mkdir -p Payload
-          # 注意：这里的 Runner.app 是 Flutter 默认的项目名称
           cp -r build/ios/iphoneos/Runner.app Payload/
           zip -r ADAS_HelloWorld.ipa Payload
 
-      # 8. 将成品上传到 GitHub Actions 的 Artifacts 页面
-      - name: Upload Artifact
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
           name: ADAS-App-Package
