@@ -2,13 +2,12 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [ main ]  # 确保你的主分支名是 main，如果是 master 请修改
-  pull_request:
     branches: [ main ]
+  workflow_dispatch: # 允许你手动点击按钮触发运行
 
 jobs:
   build:
-    runs-on: macos-latest  # 必须使用 macOS 运行器
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -18,34 +17,45 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true 
+          cache: true
 
-      - name: Install Dart Dependencies
-        run: flutter pub get
+      # 1. 彻底初始化项目，确保 ios 目录存在
+      - name: Force Create iOS Project
+        run: |
+          flutter create --platforms=ios .
+          flutter pub get
 
-      - name: Repair and Create iOS Project
-        # 这一步会根据你的 pubspec.yaml 自动生成缺失的 ios/Runner.xcodeproj 等文件
-        run: flutter create . --platforms=ios
-
+      # 2. 补全 CocoaPods 环境 (这步容易出错，增加失败重试)
       - name: Install CocoaPods
-        # iOS 编译的核心依赖管理，必须运行
         run: |
           cd ios
-          pod install
+          # 如果 Podfile 丢失，强制创建默认的
+          if [ ! -f "Podfile" ]; then
+            pod init
+          fi
+          pod install || pod install --repo-update
           cd ..
 
+      # 3. 执行 iOS 编译
       - name: Build iOS App Bundle
-        # 生成未签名的 .app 构建产物
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign --verbose
 
-      - name: Create IPA Package for Sideloadly
-        # 将 .app 包装成 .ipa 格式，方便在 Windows 上通过 Sideloadly 安装
+      # 4. 转换为 IPA 格式 (Sideloadly 必备)
+      - name: Create IPA Package
         run: |
           mkdir -p Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
+          # 寻找生成的 .app 文件并移动
+          APP_PATH=$(find build/ios/iphoneos -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "错误：找不到编译出的 .app 文件"
+            exit 1
+          fi
+          cp -r "$APP_PATH" Payload/
           zip -r ADAS_HelloWorld.ipa Payload
 
-      - name: Upload Result
+      # 5. 上传成品
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ADAS-App-Package
