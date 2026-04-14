@@ -1,1 +1,19 @@
+name: my_adas_app
+description: A new Flutter ADAS project.
+publish_to: 'none'
+version: 1.0.0+1
 
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  camera: ^0.10.5  # 以后调用摄像头用
+  permission_handler: ^11.0.0 # 申请权限
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/yolov8s.mlpackage/  # 预留给您的模型文件
